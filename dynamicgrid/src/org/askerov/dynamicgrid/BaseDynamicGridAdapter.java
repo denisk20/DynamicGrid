@@ -43,6 +43,13 @@ public abstract class BaseDynamicGridAdapter extends AbstractDynamicGridAdapter 
         notifyDataSetChanged();
     }
 
+    public void setItemAtPosition(Object item, int position) {
+        removeStableID(mItems.get(position));
+        mItems.set(position, item);
+        addStableId(item);
+        notifyDataSetChanged();
+    }
+
     public void clear() {
         clearStableIdMap();
         mItems.clear();
