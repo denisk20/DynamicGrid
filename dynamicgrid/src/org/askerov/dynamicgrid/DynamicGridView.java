@@ -723,6 +723,21 @@ public class DynamicGridView extends GridView {
         }
     }
 
+    public void shuffle() {
+        final Map<Integer, Integer> positionsMap = getAdapterInterface().getPositiotChangeMap();
+        final ViewTreeObserver observer = getViewTreeObserver();
+        if(isPostHoneycomb() && observer != null) {
+            observer.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    observer.removeOnPreDrawListener(this);
+                    animateShuffling(positionsMap);
+                    return true;
+                }
+            });
+        }
+    }
+
     private boolean belowLeft(Point targetColumnRowPair, Point mobileColumnRowPair) {
         return targetColumnRowPair.y > mobileColumnRowPair.y && targetColumnRowPair.x < mobileColumnRowPair.x;
     }
@@ -765,6 +780,38 @@ public class DynamicGridView extends GridView {
 
     private long getId(int position) {
         return getAdapter().getItemId(position);
+    }
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    private void animateShuffling(final Map<Integer, Integer> positionMap) {
+        List<Animator> resultList = new LinkedList<Animator>();
+        for(Map.Entry<Integer, Integer> pos: positionMap.entrySet()) {
+            View startView = getViewForId(getId(pos.getKey()));
+            View destView = getViewForId(getId(pos.getValue()));
+            int xShift = destView.getLeft() - startView.getLeft();
+            int yShift = destView.getTop() - startView.getTop();
+
+            resultList.add(createTranslationAnimations(startView, 0, xShift, 0, yShift));
+        }
+        AnimatorSet resultSet = new AnimatorSet();
+        resultSet.playTogether(resultList);
+        resultSet.setDuration(MOVE_DURATION);
+        resultSet.setInterpolator(new AccelerateDecelerateInterpolator());
+        resultSet.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                mReorderAnimation = true;
+                updateEnableState();
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mReorderAnimation = false;
+                getAdapterInterface().doShuffle(positionMap);
+                updateEnableState();
+            }
+        });
+        resultSet.start();
     }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +126,31 @@ public abstract class BaseDynamicGridAdapter extends AbstractDynamicGridAdapter 
             DynamicGridUtils.reorder(mItems, originalPosition, newPosition);
             notifyDataSetChanged();
         }
+    }
+
+    @Override
+    public Map<Integer, Integer> getPositiotChangeMap() {
+        HashMap<Integer, Integer> positionsChangeMap = new HashMap<Integer, Integer>();
+        ArrayList<Object> copy = new ArrayList<Object>(mItems);
+        Collections.shuffle(copy);
+        for(int i = 0; i < copy.size(); i++) {
+            positionsChangeMap.put(i, copy.indexOf(mItems.get(i)));
+        }
+
+        //need to call this
+        notifyDataSetChanged();
+
+        return positionsChangeMap;
+    }
+
+    @Override
+    public void doShuffle(Map<Integer, Integer> positionsChangeMap) {
+        ArrayList<Object> copy = new ArrayList<Object>(mItems);
+        for(Map.Entry<Integer, Integer> pos: positionsChangeMap.entrySet()) {
+            mItems.set(pos.getValue(), copy.get(pos.getKey()));
+        }
+
+        notifyDataSetChanged();
     }
 
     @Override
