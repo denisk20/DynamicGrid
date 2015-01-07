@@ -505,7 +505,6 @@ public class DynamicGridView extends GridView {
                 mSelectedItemBitmapCreationListener.onPostSelectedItemBitmapCreation(selectedView, position, mMobileItemId);
             if (isPostHoneycomb()) {
                 selectedView.setVisibility(View.INVISIBLE);
-                getAdapterInterface().getViewVisibilityMap().put(position, false);
             }
             mCellIsMobile = true;
             updateNeighborViewsForId(mMobileItemId);
@@ -618,7 +617,6 @@ public class DynamicGridView extends GridView {
 
     private void reset(View mobileView) {
         idList.clear();
-        getAdapterInterface().getViewVisibilityMap().put(getPositionForID(mMobileItemId), true);
         mobileView.setVisibility(View.VISIBLE);
         mMobileItemId = INVALID_ID;
         mHoverCell = null;

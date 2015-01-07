@@ -36,9 +36,4 @@ public interface DynamicGridAdapterInterface {
      */
     int getColumnCount();
 
-    /**
-     * @return map of <position, visible> entries which describe if the view on certain position is visible.
-     * If there is no entry for certain position, it is assumed that the view is visible
-     */
-    Map<Integer, Boolean> getViewVisibilityMap();
 }
