@@ -87,6 +87,7 @@ public class DynamicGridView extends GridView {
     private DynamicGridModification mCurrentModification;
 
     private OnSelectedItemBitmapCreationListener mSelectedItemBitmapCreationListener;
+    private View mMobileView;
 
 
     public DynamicGridView(Context context) {
@@ -296,13 +297,23 @@ public class DynamicGridView extends GridView {
 
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
-    private ObjectAnimator createBaseWobble(View v) {
+    private ObjectAnimator createBaseWobble(final View v) {
+
+        if (!isPreL())
+            v.setLayerType(LAYER_TYPE_SOFTWARE, null);
+
         ObjectAnimator animator = new ObjectAnimator();
         animator.setDuration(180);
         animator.setRepeatMode(ValueAnimator.REVERSE);
         animator.setRepeatCount(ValueAnimator.INFINITE);
         animator.setPropertyName("rotation");
         animator.setTarget(v);
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                v.setLayerType(LAYER_TYPE_NONE, null);
+            }
+        });
         return animator;
     }
 
@@ -399,7 +410,6 @@ public class DynamicGridView extends GridView {
                 mDownX = (int) event.getX();
                 mDownY = (int) event.getY();
                 mActivePointerId = event.getPointerId(0);
-
                 if (mIsEditMode && isEnabled()) {
                     layoutChildren();
                     int position = pointToPosition(mDownX, mDownY);
@@ -409,6 +419,7 @@ public class DynamicGridView extends GridView {
                 }
 
                 break;
+
             case MotionEvent.ACTION_MOVE:
                 if (mActivePointerId == INVALID_ID) {
                     break;
@@ -431,8 +442,8 @@ public class DynamicGridView extends GridView {
                     handleMobileCellScroll();
                     return false;
                 }
-
                 break;
+
             case MotionEvent.ACTION_UP:
                 touchEventsEnded();
 
@@ -449,6 +460,7 @@ public class DynamicGridView extends GridView {
                     }
                 }
                 break;
+
             case MotionEvent.ACTION_CANCEL:
                 touchEventsCancelled();
 
@@ -458,6 +470,7 @@ public class DynamicGridView extends GridView {
                     }
                 }
                 break;
+
             case MotionEvent.ACTION_POINTER_UP:
                 /* If a multitouch event took place and the original touch dictating
                  * the movement of the hover cell has ended, then the dragging event
@@ -470,6 +483,7 @@ public class DynamicGridView extends GridView {
                     touchEventsEnded();
                 }
                 break;
+
             default:
                 break;
         }
@@ -608,10 +622,20 @@ public class DynamicGridView extends GridView {
         mobileView.setVisibility(View.VISIBLE);
         mMobileItemId = INVALID_ID;
         mHoverCell = null;
-        if (!mIsEditMode && isPostHoneycomb() && mWobbleInEditMode)
-            stopWobble(true);
-        if (mIsEditMode && isPostHoneycomb() && mWobbleInEditMode)
-            restartWobble();
+        if (isPostHoneycomb() && mWobbleInEditMode) {
+            if (mIsEditMode) {
+                restartWobble();
+            } else{
+                stopWobble(true);
+            }
+        }
+        //ugly fix for unclear disappearing items after reorder
+        for (int i = 0; i < getLastVisiblePosition() - getFirstVisiblePosition(); i++) {
+            View child = getChildAt(i);
+            if (child != null) {
+                child.setVisibility(View.VISIBLE);
+            }
+        }
         invalidate();
     }
 
@@ -627,6 +651,21 @@ public class DynamicGridView extends GridView {
      */
     private boolean isPostHoneycomb() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB;
+    }
+
+    /**
+     * The GridView from Android L requires some different setVisibility() logic
+     * when switching cells. Unfortunately, both 4.4W and the pre-release L
+     * report 20 for the SDK_INT, but we want to return true for 4.4W and false
+     * for Android L. So, we check the release name for "L" if we see SDK 20.
+     * Hopefully, Android L will actually be SDK 21 or later when it ships.
+     *
+     * @return
+     */
+    public static boolean isPreL() {
+        final int KITKAT_WATCH = 20;
+        return (Build.VERSION.SDK_INT < KITKAT_WATCH) ||
+                ((Build.VERSION.SDK_INT == KITKAT_WATCH) && !"L".equals(Build.VERSION.RELEASE));
     }
 
     private void touchEventsCancelled() {
@@ -645,11 +684,11 @@ public class DynamicGridView extends GridView {
         final int deltaX = mLastEventX - mDownX;
         final int deltaYTotal = mHoverCellOriginalBounds.centerY() + mTotalOffsetY + deltaY;
         final int deltaXTotal = mHoverCellOriginalBounds.centerX() + mTotalOffsetX + deltaX;
-        View mobileView = getViewForId(mMobileItemId);
+        mMobileView = getViewForId(mMobileItemId);
         View targetView = null;
         float vX = 0;
         float vY = 0;
-        Point mobileColumnRowPair = getColumnAndRowForView(mobileView);
+        Point mobileColumnRowPair = getColumnAndRowForView(mMobileView);
         for (Long id : idList) {
             View view = getViewForId(id);
             if (view != null) {
@@ -670,8 +709,8 @@ public class DynamicGridView extends GridView {
                         && deltaXTotal > view.getLeft() + mOverlapIfSwitchStraightLine
                         || left(targetColumnRowPair, mobileColumnRowPair)
                         && deltaXTotal < view.getRight() - mOverlapIfSwitchStraightLine)) {
-                    float xDiff = Math.abs(DynamicGridUtils.getViewX(view) - DynamicGridUtils.getViewX(mobileView));
-                    float yDiff = Math.abs(DynamicGridUtils.getViewY(view) - DynamicGridUtils.getViewY(mobileView));
+                    float xDiff = Math.abs(DynamicGridUtils.getViewX(view) - DynamicGridUtils.getViewX(mMobileView));
+                    float yDiff = Math.abs(DynamicGridUtils.getViewY(view) - DynamicGridUtils.getViewY(mMobileView));
                     if (xDiff >= vX && yDiff >= vY) {
                         vX = xDiff;
                         vY = yDiff;
@@ -681,7 +720,7 @@ public class DynamicGridView extends GridView {
             }
         }
         if (targetView != null) {
-            final int originalPosition = getPositionForView(mobileView);
+            final int originalPosition = getPositionForView(mMobileView);
             int targetPosition = getPositionForView(targetView);
 
             if (targetPosition == INVALID_POSITION) {
@@ -696,29 +735,135 @@ public class DynamicGridView extends GridView {
 
             mDownY = mLastEventY;
             mDownX = mLastEventX;
-            mobileView.setVisibility(View.VISIBLE);
-            getAdapterInterface().getViewVisibilityMap().put(originalPosition, true);
-            if (isPostHoneycomb()) {
-                targetView.setVisibility(View.INVISIBLE);
-                getAdapterInterface().getViewVisibilityMap().put(targetPosition, false);
-            }
+
+            SwitchCellAnimator switchCellAnimator;
+
+            if (isPostHoneycomb() && isPreL())   //Between Android 3.0 and Android L
+                switchCellAnimator = new KitKatSwitchCellAnimator(deltaX, deltaY);
+            else if (isPreL())                   //Before Android 3.0
+                switchCellAnimator = new PreHoneycombCellAnimator(deltaX, deltaY);
+            else                                //Android L
+                switchCellAnimator = new LSwitchCellAnimator(deltaX, deltaY);
+
             updateNeighborViewsForId(mMobileItemId);
-            final ViewTreeObserver observer = getViewTreeObserver();
-            final int finalTargetPosition = targetPosition;
-            if (isPostHoneycomb() && observer != null) {
-                observer.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                    @Override
-                    public boolean onPreDraw() {
-                        observer.removeOnPreDrawListener(this);
-                        mTotalOffsetY += deltaY;
-                        mTotalOffsetX += deltaX;
-                        animateReorder(originalPosition, finalTargetPosition);
-                        return true;
-                    }
-                });
-            } else {
-                mTotalOffsetY += deltaY;
-                mTotalOffsetX += deltaX;
+
+            switchCellAnimator.animateSwitchCell(originalPosition, targetPosition);
+        }
+    }
+
+    private interface SwitchCellAnimator {
+        void animateSwitchCell(final int originalPosition, final int targetPosition);
+    }
+
+    private class PreHoneycombCellAnimator implements SwitchCellAnimator {
+        private int mDeltaY;
+        private int mDeltaX;
+
+        public PreHoneycombCellAnimator(int deltaX, int deltaY) {
+            mDeltaX = deltaX;
+            mDeltaY = deltaY;
+        }
+
+        @Override
+        public void animateSwitchCell(int originalPosition, int targetPosition) {
+            mTotalOffsetY += mDeltaY;
+            mTotalOffsetX += mDeltaX;
+        }
+    }
+
+    /**
+     * A {@link org.askerov.dynamicgrid.DynamicGridView.SwitchCellAnimator} for versions KitKat and below.
+     */
+    private class KitKatSwitchCellAnimator implements SwitchCellAnimator {
+
+        private int mDeltaY;
+        private int mDeltaX;
+
+        public KitKatSwitchCellAnimator(int deltaX, int deltaY) {
+            mDeltaX = deltaX;
+            mDeltaY = deltaY;
+        }
+
+        @Override
+        public void animateSwitchCell(final int originalPosition, final int targetPosition) {
+            assert mMobileView != null;
+            getViewTreeObserver().addOnPreDrawListener(new AnimateSwitchViewOnPreDrawListener(mMobileView, originalPosition, targetPosition));
+            mMobileView = getViewForId(mMobileItemId);
+        }
+
+        private class AnimateSwitchViewOnPreDrawListener implements ViewTreeObserver.OnPreDrawListener {
+
+            private final View mPreviousMobileView;
+            private final int mOriginalPosition;
+            private final int mTargetPosition;
+
+            AnimateSwitchViewOnPreDrawListener(final View previousMobileView, final int originalPosition, final int targetPosition) {
+                mPreviousMobileView = previousMobileView;
+                mOriginalPosition = originalPosition;
+                mTargetPosition = targetPosition;
+            }
+
+            @Override
+            public boolean onPreDraw() {
+                getViewTreeObserver().removeOnPreDrawListener(this);
+
+                mTotalOffsetY += mDeltaY;
+                mTotalOffsetX += mDeltaX;
+
+                animateReorder(mOriginalPosition, mTargetPosition);
+
+                mPreviousMobileView.setVisibility(View.VISIBLE);
+
+                if (mMobileView != null) {
+                    mMobileView.setVisibility(View.INVISIBLE);
+                }
+                return true;
+            }
+        }
+    }
+
+    /**
+     * A {@link org.askerov.dynamicgrid.DynamicGridView.SwitchCellAnimator} for versions L and above.
+     */
+    private class LSwitchCellAnimator implements SwitchCellAnimator {
+
+        private int mDeltaY;
+        private int mDeltaX;
+
+        public LSwitchCellAnimator(int deltaX, int deltaY) {
+            mDeltaX = deltaX;
+            mDeltaY = deltaY;
+        }
+
+        @Override
+        public void animateSwitchCell(final int originalPosition, final int targetPosition) {
+            getViewTreeObserver().addOnPreDrawListener(new AnimateSwitchViewOnPreDrawListener(originalPosition, targetPosition));
+        }
+
+        private class AnimateSwitchViewOnPreDrawListener implements ViewTreeObserver.OnPreDrawListener {
+            private final int mOriginalPosition;
+            private final int mTargetPosition;
+
+            AnimateSwitchViewOnPreDrawListener(final int originalPosition, final int targetPosition) {
+                mOriginalPosition = originalPosition;
+                mTargetPosition = targetPosition;
+            }
+
+            @Override
+            public boolean onPreDraw() {
+                getViewTreeObserver().removeOnPreDrawListener(this);
+
+                mTotalOffsetY += mDeltaY;
+                mTotalOffsetX += mDeltaX;
+
+                animateReorder(mOriginalPosition, mTargetPosition);
+
+                assert mMobileView != null;
+                mMobileView.setVisibility(View.VISIBLE);
+                mMobileView = getViewForId(mMobileItemId);
+                assert mMobileView != null;
+                mMobileView.setVisibility(View.INVISIBLE);
+                return true;
             }
         }
     }

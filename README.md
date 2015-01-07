@@ -10,7 +10,7 @@ Demo
 " target="_blank"><img src="http://img.youtube.com/vi/zlzNvxksIfY/0.jpg" 
 alt="example" width="240" height="180" border="10" /></a>
 
-Requrements
+Requirements
 ----------
 Rearranging items require api 8 (Froyo).
 All grid item animations require api 11 (Honeycomb).
@@ -48,7 +48,7 @@ Adding drop listener:
             }
         });
 
-You can find more detailed usage examle [here](https://github.com/askerov/DynamicGrid/tree/master/example).  
+You can find more detailed usage example [here](https://github.com/askerov/DynamicGrid/tree/master/example).  
 
 Credits
 --------
